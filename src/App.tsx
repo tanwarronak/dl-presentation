@@ -5,6 +5,7 @@ import StudentJoin from './pages/StudentJoin'
 import SetupScreen from './pages/SetupScreen'
 import { supabaseConfigured } from './lib/supabase'
 import './App.css'
+import './ui-polish.css'
 
 function App() {
   if (!supabaseConfigured) return <SetupScreen />
