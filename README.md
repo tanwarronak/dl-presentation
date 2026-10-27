@@ -15,8 +15,10 @@ A real-time classroom application for collecting study-hours and exam-mark data,
 2. Run `npm install`.
 3. Copy `.env.example` to `.env` and add the public Supabase URL and anon key.
 4. Run `supabase/migrations/001_live_regression_lab.sql` in the Supabase SQL editor.
-5. Enable Email authentication in Supabase.
+5. Enable **Anonymous sign-ins** under Supabase Authentication → Providers.
 6. Start the app with `npm run dev`.
+
+Teacher access uses Supabase Anonymous Auth. No email or password is requested, while `owner_id` and Row Level Security still restrict session controls to the browser identity that created the classroom.
 
 ## Classroom flow
 
@@ -27,6 +29,8 @@ A real-time classroom application for collecting study-hours and exam-mark data,
 5. Submit data and watch the dashboard update through Realtime.
 
 ## Supabase authentication redirects
+
+Email-based redirects are not required when the no-login teacher flow uses Anonymous Auth.
 
 Supabase controls the destination after email confirmation. For local development, configure Authentication under **URL Configuration** with:
 
