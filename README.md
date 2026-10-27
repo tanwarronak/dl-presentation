@@ -14,7 +14,7 @@ A real-time classroom application for collecting study-hours and exam-mark data,
 1. Install Node.js 20 or newer.
 2. Run `npm install`.
 3. Copy `.env.example` to `.env` and add the public Supabase URL and anon key.
-4. Run `supabase/migrations/001_live_regression_lab.sql` in the Supabase SQL editor.
+4. Run `supabase/migrations/001_live_regression_lab.sql` in the Supabase SQL editor for the exact project matching `VITE_SUPABASE_URL`. If REST returns `PGRST205`, the migration has not been run in that project.
 5. Enable **Anonymous sign-ins** under Supabase Authentication → Providers.
 6. Start the app with `npm run dev`.
 

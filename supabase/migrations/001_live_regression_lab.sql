@@ -37,4 +37,32 @@ begin
   return r;
 end;$$;
 
-alter publication supabase_realtime add table public.classroom_sessions, public.student_submissions;
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.classroom_sessions to authenticated;
+grant select, insert, update, delete on public.student_submissions to authenticated;
+grant execute on function public.join_session(text) to anon, authenticated;
+grant execute on function public.submit_submission(text,text,numeric,numeric) to anon, authenticated;
+
+alter table public.classroom_sessions replica identity full;
+alter table public.student_submissions replica identity full;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'classroom_sessions'
+  ) then
+    alter publication supabase_realtime add table public.classroom_sessions;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'student_submissions'
+  ) then
+    alter publication supabase_realtime add table public.student_submissions;
+  end if;
+end;
+$$;
