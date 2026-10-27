@@ -26,7 +26,16 @@ A real-time classroom application for collecting study-hours and exam-mark data,
 4. Share `/join/ROOM-CODE` with students.
 5. Submit data and watch the dashboard update through Realtime.
 
-## Supabase security
+## Supabase authentication redirects
+
+Supabase controls the destination after email confirmation. For local development, configure Authentication under **URL Configuration** with:
+
+- Site URL: `http://localhost:5173`
+- Redirect URLs: `http://localhost:5173/**`
+
+For production, add the full deployment origin, such as `https://dl-presentation.vercel.app/**`, and set that origin as the Site URL or production redirect URL.
+
+A link ending in `/` with an access token hash is expected and should be handled by Supabase on the page that opens. It must use a port the Vite server is running on, such as `5173`, and not an unavailable port such as `3000`.
 
 The migration creates the classroom and submission tables, value constraints, owner-only RLS policies, public join/submit RPCs, indexes, and Realtime publication entries. Never expose the service-role key in browser code.
 
