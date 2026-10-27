@@ -14,6 +14,10 @@ create index if not exists submissions_session_idx on public.student_submissions
 alter table public.classroom_sessions enable row level security;
 alter table public.student_submissions enable row level security;
 
+drop policy if exists "owners read their sessions" on public.classroom_sessions;
+drop policy if exists "owners manage their sessions" on public.classroom_sessions;
+drop policy if exists "owners read submissions" on public.student_submissions;
+drop policy if exists "owners delete submissions" on public.student_submissions;
 create policy "owners read their sessions" on public.classroom_sessions for select to authenticated using (auth.uid() = owner_id);
 create policy "owners manage their sessions" on public.classroom_sessions for all to authenticated using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
 create policy "owners read submissions" on public.student_submissions for select to authenticated using (exists (select 1 from public.classroom_sessions s where s.id = session_id and s.owner_id = auth.uid()));
@@ -66,3 +70,5 @@ begin
   end if;
 end;
 $$;
+
+notify pgrst, 'reload schema';
