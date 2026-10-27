@@ -96,6 +96,27 @@ body { background: #eef2ef; }
 .prediction input { height: 54px; }
 .sample-tag { border-radius: 999px; }
 
+.chart-legend {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  border-top: 1px solid #edf0ed;
+  border-bottom: 1px solid #edf0ed;
+  margin-bottom: 4px;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-size: 13px;
+  color: #53615a;
+}
+.chart-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.chart-legend i { display: inline-block; flex: 0 0 auto; }
+.legend-point { width: 10px; height: 10px; border-radius: 50%; background: #167c6b; box-shadow: 0 0 0 3px #e0efea; }
+.legend-line { width: 24px; height: 3px; border-radius: 2px; background: #ed6a3a; }
+.legend-prediction { width: 11px; height: 11px; background: #efb000; transform: rotate(45deg); }
+.recharts-legend-wrapper { display: none !important; }
+.recharts-default-tooltip { font-family: "Trebuchet MS", "Segoe UI", sans-serif; }
+
 .table-scroll { scrollbar-width: thin; }
 .table-scroll th {
   background: #f4f6f4;
