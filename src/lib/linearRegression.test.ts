@@ -1,0 +1,15 @@
+import { describe, expect, it } from 'vitest';
+import { calculateRegression, predictAt, validateSubmission } from './linearRegression';
+
+describe('linear regression', () => {
+  it('fits a positive slope', () => { const r = calculateRegression([{ studyHours: 1, examMarks: 40 }, { studyHours: 2, examMarks: 50 }, { studyHours: 3, examMarks: 60 }]); expect(r.slope).toBeCloseTo(10); expect(r.intercept).toBeCloseTo(30); });
+  it('fits a negative slope', () => { const r = calculateRegression([{ studyHours: 1, examMarks: 90 }, { studyHours: 2, examMarks: 80 }, { studyHours: 3, examMarks: 70 }]); expect(r.slope).toBeCloseTo(-10); });
+  it('handles perfect linear data and verification checks', () => { const r = calculateRegression([{ studyHours: 1, examMarks: 4 }, { studyHours: 2, examMarks: 6 }, { studyHours: 3, examMarks: 8 }]); expect(r.sse).toBeCloseTo(0); expect(r.residualSum).toBeCloseTo(0); expect(r.covarianceResidualSum).toBeCloseTo(0); expect(r.passesThroughMean).toBe(true); });
+  it('handles empty and single-point datasets', () => { expect(calculateRegression([]).count).toBe(0); expect(calculateRegression([{ studyHours: 2, examMarks: 55 }]).slope).toBeNull(); });
+  it('handles identical study hours', () => { const r = calculateRegression([{ studyHours: 4, examMarks: 40 }, { studyHours: 4, examMarks: 60 }]); expect(r.slope).toBeNull(); expect(r.sxx).toBe(0); });
+  it('handles identical marks and undefined r-squared', () => { const r = calculateRegression([{ studyHours: 1, examMarks: 50 }, { studyHours: 2, examMarks: 50 }, { studyHours: 3, examMarks: 50 }]); expect(r.slope).toBe(0); expect(r.rSquared).toBeNull(); });
+  it('supports decimals and predictions', () => { const r = calculateRegression([{ studyHours: 1.5, examMarks: 52 }, { studyHours: 2.5, examMarks: 61 }, { studyHours: 3.5, examMarks: 70 }]); expect(predictAt(r, 5)).not.toBeNull(); });
+  it('validates boundaries', () => { expect(validateSubmission(0, 0).valid).toBe(true); expect(validateSubmission(12, 100).valid).toBe(true); expect(validateSubmission(-1, 50).valid).toBe(false); expect(validateSubmission(5, 101).valid).toBe(false); });
+  it('calculates SSE, MSE, RMSE, and r-squared', () => { const r = calculateRegression([{ studyHours: 0, examMarks: 0 }, { studyHours: 1, examMarks: 2 }, { studyHours: 2, examMarks: 6 }]); expect(r.sse).not.toBeNull(); expect(r.mse).toBeCloseTo((r.sse ?? 0) / 3); expect(r.rmse).toBeCloseTo(Math.sqrt(r.mse ?? 0)); expect(r.rSquared).not.toBeNull(); });
+  it('recalculates after insertion, correction, and deletion conceptually', () => { const a = [{ studyHours: 1, examMarks: 40 }, { studyHours: 2, examMarks: 50 }]; const inserted = calculateRegression([...a, { studyHours: 3, examMarks: 60 }]); const corrected = calculateRegression([{ studyHours: 1, examMarks: 40 }, { studyHours: 2, examMarks: 70 }]); const deleted = calculateRegression([a[0]]); expect(inserted.slope).not.toBeNull(); expect(corrected.slope).not.toBeNull(); expect(deleted.slope).toBeNull(); });
+});
