@@ -146,6 +146,21 @@ body { background: #eef2ef; }
 }
 .student h1 { font-family: Georgia, "Times New Roman", serif; }
 .closed { border: 1px solid #dfe5e0; }
+.module-nav { display:flex; gap:6px; margin:16px 0 4px; flex-wrap:wrap; }
+.module-nav button { height:40px; border:1px solid #ccd6cf; border-radius:6px; background:#fff; color:#53615a; padding:0 14px; font-family:"Trebuchet MS","Segoe UI",sans-serif; font-weight:800; }
+.module-nav button.active { border-color:#167c6b; background:#167c6b; color:#fff; }
+.student-form select,.stack select,.control-grid select { height:48px; border:1px solid #cbd4ce; border-radius:6px; background:#fff; color:#17212b; padding:0 12px; }
+.control-grid { display:grid; grid-template-columns:1fr; gap:10px; margin-bottom:14px; }
+.control-grid label { display:grid; gap:7px; font-family:"Trebuchet MS","Segoe UI",sans-serif; font-size:13px; font-weight:800; }
+.secondary-button { min-height:42px; border:1px solid #bcc6bf; border-radius:6px; background:#fff; display:inline-flex; align-items:center; justify-content:center; gap:7px; font-weight:800; }
+.cluster-counts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:12px; }
+.cluster-counts div { border:1px solid #e0e5e1; border-radius:6px; padding:10px; display:flex; justify-content:space-between; font-family:"Trebuchet MS","Segoe UI",sans-serif; }
+.cluster-counts span { color:#66716c; font-size:12px; }
+.prediction-result { margin-top:14px; min-height:64px; border-radius:6px; background:#eef5f2; padding:12px; display:flex; flex-direction:column; }
+.prediction-result strong { font-size:24px; color:#167c6b; }
+.mini-chart { height:220px; }
+.threshold { width:100%; accent-color:#167c6b; }
+.threshold-value { display:block; margin-bottom:10px; font-size:22px; color:#167c6b; }
 
 @media (max-width: 900px) {
   .home-grid { grid-template-columns: 1fr; gap: 20px; padding: 36px 16px; }

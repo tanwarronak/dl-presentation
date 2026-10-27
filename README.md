@@ -14,7 +14,7 @@ A real-time classroom application for collecting study-hours and exam-mark data,
 1. Install Node.js 20 or newer.
 2. Run `npm install`.
 3. Copy `.env.example` to `.env` and add the public Supabase URL and anon key.
-4. Run `supabase/migrations/001_live_regression_lab.sql` in the Supabase SQL editor for the exact project matching `VITE_SUPABASE_URL`. If REST returns `PGRST205`, the migration has not been run in that project.
+4. Run `supabase/migrations/001_live_regression_lab.sql`, then `supabase/migrations/002_classification_clustering.sql`, in the Supabase SQL editor for the exact project matching `VITE_SUPABASE_URL`. If REST returns `PGRST205`, the migration has not been run in that project.
 5. Enable **Anonymous sign-ins** under Supabase Authentication → Providers.
 6. Start the app with `npm run dev`.
 
@@ -22,11 +22,22 @@ Teacher access uses Supabase Anonymous Auth. No email or password is requested, 
 
 ## Classroom flow
 
-1. Sign in from `/` with a teacher email.
-2. Create a session and copy its joining link.
-3. Open the `/teacher/:id` dashboard and select Start.
-4. Share `/join/ROOM-CODE` with students.
-5. Submit data and watch the dashboard update through Realtime.
+1. Open `/` with a browser that will host the classroom.
+2. Choose Regression, Classification, or Clustering.
+3. Create a session and copy its joining link.
+4. Open the module dashboard and select Start.
+5. Share `/join/ROOM-CODE` with students.
+6. Submit data and watch the dashboard update through Realtime.
+
+## Lab dataset isolation
+
+Each lab has its own submission table and student form:
+
+- Regression: exam marks in `student_submissions`
+- Classification: Pass/Fail labels in `classification_submissions`
+- Clustering: unlabeled study-hours and attendance records in `clustering_submissions`
+
+The join RPC returns the classroom module and dispatches students to the matching form. Supabase submission RPCs independently enforce active sessions and numeric ranges.
 
 ## Supabase authentication redirects
 
