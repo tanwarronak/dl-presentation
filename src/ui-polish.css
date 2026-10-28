@@ -66,6 +66,7 @@ body { background: #eef2ef; }
 
 .dashboard { background: #edf1ed; }
 .dash-header { height: 76px; }
+.header-status-group { display:flex; align-items:center; gap:10px; }
 .live-status { font-size: 12px; border-radius: 999px; padding: 8px 12px; }
 .session-bar { background: rgba(255,255,255,.94); min-height: 98px; }
 .join-code {
@@ -75,6 +76,14 @@ body { background: #eef2ef; }
 }
 .join-code button { width: 38px; height: 38px; border-radius: 50%; background: #edf5f2; }
 .student-count { background: #f3f6f3; border-radius: 6px; min-height: 58px; padding: 8px 12px; }
+.session-state { display:flex; align-items:center; gap:8px; width:max-content; border:1px solid #dfe5e0; border-radius:999px; padding:8px 12px; background:#f6f8f6; color:#53615a; font:700 12px "Trebuchet MS","Segoe UI",sans-serif; text-transform:capitalize; }
+.session-state > span { width:9px; height:9px; border-radius:50%; background:#87938b; }
+.session-state.status-active { color:#126b4f; background:#e9f5ef; border-color:#cce6d8; }
+.session-state.status-active > span { background:#16845c; }
+.session-state.status-paused { color:#8a5a00; background:#fff6dd; border-color:#f0dfaa; }
+.session-state.status-paused > span { background:#d89b18; }
+.session-state.status-ended { color:#8c3838; background:#fff0ef; border-color:#efd3d0; }
+.session-state.status-ended > span { background:#c45952; }
 .controls button, .sample-controls button {
   min-height: 42px;
   border-radius: 6px;
@@ -174,6 +183,10 @@ body { background: #eef2ef; }
 }
 @media (max-width: 600px) {
   .home > header { height: 68px; }
+  .dash-header .brand strong { font-size:16px; }
+  .header-status-group { gap:5px; }
+  .header-status-group .live-status { padding:7px; font-size:0; gap:0; }
+  .header-status-group .session-state { padding:7px 8px; font-size:10px; }
   .home-grid { padding-top: 24px; }
   .home h1 { font-size: 38px; }
   .intro { font-size: 17px; }

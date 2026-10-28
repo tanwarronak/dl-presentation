@@ -1,10 +1,611 @@
-import { useEffect, useMemo, useState } from 'react';import{Activity,BarChart3,Copy,Download,Pause,Play,Square,Trash2,Users}from'lucide-react';import{useNavigate,useParams}from'react-router-dom';import{CartesianGrid,ResponsiveContainer,Scatter,ScatterChart,Tooltip,XAxis,YAxis}from'recharts';import{supabase}from'../lib/supabase';import{calculateRegression,predictAt,type Point,type RegressionResult}from'../lib/linearRegression';
-interface Session{id:string;room_code:string;title:string;status:string}
-interface Submission{id:string;student_label:string|null;study_hours:number|string;exam_marks:number|string}
-const fmt=(v:number|null|undefined)=>v===null||v===undefined||!Number.isFinite(v)?'Undefined':v.toFixed(2);
-export default function TeacherDashboard(){const{id}=useParams();const navigate=useNavigate();const[session,setSession]=useState<Session|null>(null);const[rows,setRows]=useState<Submission[]>([]);const[sample,setSample]=useState<Point[]>([]);const[connection,setConnection]=useState('Connecting');const[prediction,setPrediction]=useState('6');const[message,setMessage]=useState('');const[loading,setLoading]=useState(true);useEffect(()=>{if(!supabase||!id)return;let channel:any;async function load(){const{data,error}=await supabase!.from('classroom_sessions').select('*').eq('id',id).single();if(error){setMessage(error.message);setLoading(false);return}setSession(data as Session);const{data:submissions}=await supabase!.from('student_submissions').select('*').eq('session_id',id).order('created_at',{ascending:true});setRows((submissions||[])as Submission[]);setLoading(false);channel=supabase!.channel(`session-${id}`).on('postgres_changes',{event:'*',schema:'public',table:'student_submissions',filter:`session_id=eq.${id}`},payload=>{if(payload.eventType==='DELETE')setRows(c=>c.filter(r=>r.id!==payload.old.id));else{const row=payload.new as Submission;setRows(c=>c.some(r=>r.id===row.id)?c.map(r=>r.id===row.id?row:r):[...c,row])}}).on('postgres_changes',{event:'UPDATE',schema:'public',table:'classroom_sessions',filter:`id=eq.${id}`},payload=>setSession(payload.new as Session)).subscribe(status=>setConnection(status==='SUBSCRIBED'?'Connected':status==='CHANNEL_ERROR'?'Reconnecting':'Offline'))}load();return()=>{if(channel)supabase!.removeChannel(channel)}},[id]);const points=useMemo<Point[]>(()=>[...rows.map(r=>({id:r.id,studentLabel:r.student_label||'Anonymous',studyHours:Number(r.study_hours),examMarks:Number(r.exam_marks)})),...sample.map((p,i)=>({...p,id:`sample-${i}`,studentLabel:'Illustrative sample'}))],[rows,sample]);const model=useMemo(()=>calculateRegression(points),[points]);const predicted=predictAt(model,Number(prediction));async function setStatus(status:string){const{error}=await supabase!.from('classroom_sessions').update({status}).eq('id',session!.id);if(error)setMessage(error.message)}async function clearRecords(){if(confirm('Clear every submitted record?')){const{error}=await supabase!.from('student_submissions').delete().eq('session_id',session!.id);if(error)setMessage(error.message)}}function exportCsv(){const csv=['student_label,study_hours,exam_marks',...rows.map(r=>`"${(r.student_label||'Anonymous').replaceAll('"','""')}",${r.study_hours},${r.exam_marks}`)].join('\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));const a=document.createElement('a');a.href=url;a.download=`${session?.room_code||'classroom'}-data.csv`;a.click();URL.revokeObjectURL(url)}const joinUrl=session?`${window.location.origin}/join/${session.room_code}`:'';const line=model.slope!==null&&model.intercept!==null?[{studyHours:0,examMarks:model.intercept},{studyHours:12,examMarks:model.slope*12+model.intercept}]:[];
-async function deleteSession(){if(!supabase||!session)return;if(!confirm('Delete this classroom and all submitted regression data? This cannot be undone.'))return;const{error}=await supabase.from('classroom_sessions').delete().eq('id',session.id);if(error)setMessage(error.message);else navigate('/')}
-return <main className="dashboard"><header className="dash-header"><div className="brand"><BarChart3/><div><strong>Live Regression Lab</strong><span>{session?.title||'Loading classroom'}</span></div></div><div className={`live-status ${connection.toLowerCase()}`}><Activity size={16}/>{connection}</div></header>{loading?<p className="loading">Loading classroom data...</p>:session&&<><section className="session-bar"><div><span className="label">Join classroom</span><div className="join-code">{session.room_code}<button title="Copy join link" onClick={()=>navigator.clipboard.writeText(joinUrl)}><Copy size={17}/></button></div></div><div className="student-count"><Users/><strong>{rows.length}</strong><span>submissions</span></div><div className="controls"><button onClick={()=>setStatus('active')}><Play/>Start</button><button onClick={()=>setStatus('paused')}><Pause/>Pause</button><button onClick={()=>setStatus('ended')}><Square/>End</button><button onClick={exportCsv}><Download/>CSV</button><button className="danger" onClick={deleteSession}><Trash2/>Delete session</button></div></section><section className="chart-grid"><article className="chart-panel"><div className="panel-heading"><div><span className="label">Study hours vs. exam marks</span><h2>{rows.length===0?'Waiting for data':`${rows.length} observed data points`}</h2></div>{sample.length>0&&<span className="sample-tag">Illustrative sample shown</span>}</div><div className="chart-legend" aria-label="Chart legend"><span><i className="legend-point"/>Student data</span>{model.slope!==null&&<span><i className="legend-line"/>Fitted regression line</span>}{predicted!==null&&<span><i className="legend-prediction"/>Selected prediction</span>}</div><div className="chart-wrap"><ResponsiveContainer width="100%" height="100%"><ScatterChart margin={{top:16,right:24,bottom:28,left:12}}><CartesianGrid stroke="#d9e0e5"/><XAxis type="number" dataKey="studyHours" domain={[0,12]} name="Study hours" label={{value:'Study hours',position:'insideBottom',offset:-10}}/><YAxis type="number" dataKey="examMarks" domain={[0,100]} name="Marks" label={{value:'Exam marks',angle:-90,position:'insideLeft'}}/><Tooltip contentStyle={{borderRadius:'6px',border:'1px solid #d7dfd9',boxShadow:'0 8px 20px rgba(23,33,43,.12)'}}/><Scatter name="Student data" data={points} fill="#167c6b"/><Scatter name="Fitted line" data={line} fill="#ed6a3a" line shape="circle" isAnimationActive={false}/>{predicted!==null&&<Scatter name="Prediction" data={[{studyHours:Number(prediction),examMarks:predicted}]} fill="#efb000" shape="diamond"/>}</ScatterChart></ResponsiveContainer></div>{model.slope===null&&<p className="model-message">{model.message}</p>}</article><aside className="metrics"><span className="label">Current model</span><div className="equation">ŷ = {fmt(model.slope)}x + {fmt(model.intercept)}</div><div className="metric-grid"><Metric label="Slope" value={fmt(model.slope)}/><Metric label="Intercept" value={fmt(model.intercept)}/><Metric label="MSE" value={fmt(model.mse)}/><Metric label="RMSE" value={fmt(model.rmse)}/><Metric label="SSE" value={fmt(model.sse)}/><Metric label="R²" value={fmt(model.rSquared)}/></div></aside></section><section className="lower-grid"><article><span className="label">Prediction tool</span><h2>New study-hours prediction</h2><div className="prediction"><label>Study hours<input type="number" min="0" max="12" step="0.1" value={prediction} onChange={e=>setPrediction(e.target.value)}/></label><div><span>Predicted mark</span><strong>{fmt(predicted)}</strong>{predicted!==null&&(predicted<0||predicted>100)&&<small>Raw prediction is outside 0–100.</small>}</div></div></article><article><span className="label">Sample tools</span><h2>Demonstration data</h2><div className="sample-controls"><button onClick={()=>setSample([{studyHours:1,examMarks:42},{studyHours:2,examMarks:48},{studyHours:3.5,examMarks:58},{studyHours:5,examMarks:67},{studyHours:7,examMarks:79},{studyHours:8.5,examMarks:88}])}>Load sample data</button><button className="danger" onClick={()=>setSample([])}>Clear sample</button></div><button className="text-button danger-text" onClick={clearRecords}>Clear submitted records</button></article></section><DataTable model={model}/><CalculationPanel model={model}/>{message&&<p role="status" className="notice fixed-notice">{message}</p>}</>}</main>}
-function Metric({label,value}:{label:string,value:string}){return<div className="metric"><span>{label}</span><strong>{value}</strong></div>}
-function DataTable({model}:{model:RegressionResult}){return <section className="dataset"><div className="panel-heading"><div><span className="label">Current dataset</span><h2>Submitted records</h2></div></div><div className="table-scroll"><table><thead><tr><th>Student</th><th>Study hours</th><th>Marks</th><th>Residual</th></tr></thead><tbody>{model.rows.map((r,i)=><tr key={r.id||i}><td>{r.studentLabel||'Anonymous'}</td><td>{r.studyHours}</td><td>{r.examMarks}</td><td>{fmt(r.residual)}</td></tr>)}</tbody></table></div></section>}
-function CalculationPanel({model}:{model:RegressionResult}){const sx=model.rows.reduce((s,r)=>s+r.studyHours,0),sy=model.rows.reduce((s,r)=>s+r.examMarks,0);return<details className="calculation"><summary><span><strong>How Was This Line Calculated?</strong><small>View the mathematical derivation</small></span><span>+</span></summary><div className="calculation-body"><h3>1. Dataset · n = {model.count}</h3><h3>2–3. Means</h3><p>x̄ = {fmt(sx)} / {model.count} = {fmt(model.meanX)}</p><p>ȳ = {fmt(sy)} / {model.count} = {fmt(model.meanY)}</p><h3>4–6. Deviations and sums</h3><div className="table-scroll"><table><thead><tr><th>Student</th><th>xᵢ</th><th>yᵢ</th><th>xᵢ−x̄</th><th>yᵢ−ȳ</th><th>Product</th><th>(xᵢ−x̄)²</th></tr></thead><tbody>{model.rows.map((r,i)=><tr key={r.id||i}><td>{r.studentLabel||i+1}</td><td>{r.studyHours}</td><td>{r.examMarks}</td><td>{fmt(r.dx)}</td><td>{fmt(r.dy)}</td><td>{fmt(r.covarianceProduct)}</td><td>{fmt(r.squaredDx)}</td></tr>)}</tbody></table></div><p>Sxy = {fmt(model.sxy)}; Sxx = {fmt(model.sxx)}</p><h3>7–9. Fit</h3><p>m = Sxy/Sxx = {fmt(model.slope)}; b = ȳ−mx̄ = {fmt(model.intercept)}</p><p className="equation-inline">ŷ = {fmt(model.slope)}x + {fmt(model.intercept)}</p><h3>10–13. Predictions and errors</h3><div className="table-scroll"><table><thead><tr><th>xᵢ</th><th>Observed yᵢ</th><th>Predicted ŷᵢ</th><th>Residual eᵢ</th><th>eᵢ²</th></tr></thead><tbody>{model.rows.map((r,i)=><tr key={r.id||i}><td>{r.studyHours}</td><td>{r.examMarks}</td><td>{fmt(r.predicted)}</td><td>{fmt(r.residual)}</td><td>{fmt(r.squaredResidual)}</td></tr>)}</tbody></table></div><p>SSE = {fmt(model.sse)} · MSE = {fmt(model.mse)} · RMSE = {fmt(model.rmse)}</p><p>SST = {fmt(model.sst)} · R² = {fmt(model.rSquared)}</p><h3>14. Verification</h3><p>Line through mean: {model.passesThroughMean===null?'Not applicable':model.passesThroughMean?'Approximately yes':'No'}</p><p>Σ residuals = {fmt(model.residualSum)}; Σ(xᵢ−x̄)eᵢ = {fmt(model.covarianceResidualSum)}</p></div></details>}
+import { useEffect, useMemo, useState } from "react";
+import {
+  Activity,
+  BarChart3,
+  Copy,
+  Download,
+  Pause,
+  Play,
+  Square,
+  Trash2,
+  Users,
+} from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  CartesianGrid,
+  ResponsiveContainer,
+  Scatter,
+  ScatterChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { supabase } from "../lib/supabase";
+import {
+  calculateRegression,
+  predictAt,
+  type Point,
+  type RegressionResult,
+} from "../lib/linearRegression";
+interface Session {
+  id: string;
+  room_code: string;
+  title: string;
+  status: string;
+}
+interface Submission {
+  id: string;
+  student_label: string | null;
+  study_hours: number | string;
+  exam_marks: number | string;
+}
+const fmt = (v: number | null | undefined) =>
+  v === null || v === undefined || !Number.isFinite(v)
+    ? "Undefined"
+    : v.toFixed(2);
+export default function TeacherDashboard() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [session, setSession] = useState<Session | null>(null);
+  const [rows, setRows] = useState<Submission[]>([]);
+  const [sample, setSample] = useState<Point[]>([]);
+  const [connection, setConnection] = useState("Connecting");
+  const [prediction, setPrediction] = useState("6");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!supabase || !id) return;
+    let channel: any;
+    async function load() {
+      const { data, error } = await supabase!
+        .from("classroom_sessions")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (error) {
+        setMessage(error.message);
+        setLoading(false);
+        return;
+      }
+      setSession(data as Session);
+      const { data: submissions } = await supabase!
+        .from("student_submissions")
+        .select("*")
+        .eq("session_id", id)
+        .order("created_at", { ascending: true });
+      setRows((submissions || []) as Submission[]);
+      setLoading(false);
+      channel = supabase!
+        .channel(`session-${id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "student_submissions",
+            filter: `session_id=eq.${id}`,
+          },
+          (payload) => {
+            if (payload.eventType === "DELETE")
+              setRows((c) => c.filter((r) => r.id !== payload.old.id));
+            else {
+              const row = payload.new as Submission;
+              setRows((c) =>
+                c.some((r) => r.id === row.id)
+                  ? c.map((r) => (r.id === row.id ? row : r))
+                  : [...c, row],
+              );
+            }
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "classroom_sessions",
+            filter: `id=eq.${id}`,
+          },
+          (payload) => setSession(payload.new as Session),
+        )
+        .subscribe((status) =>
+          setConnection(
+            status === "SUBSCRIBED"
+              ? "Connected"
+              : status === "CHANNEL_ERROR"
+                ? "Reconnecting"
+                : "Offline",
+          ),
+        );
+    }
+    load();
+    return () => {
+      if (channel) supabase!.removeChannel(channel);
+    };
+  }, [id]);
+  const points = useMemo<Point[]>(
+    () => [
+      ...rows.map((r) => ({
+        id: r.id,
+        studentLabel: r.student_label || "Anonymous",
+        studyHours: Number(r.study_hours),
+        examMarks: Number(r.exam_marks),
+      })),
+      ...sample.map((p, i) => ({
+        ...p,
+        id: `sample-${i}`,
+        studentLabel: "Illustrative sample",
+      })),
+    ],
+    [rows, sample],
+  );
+  const model = useMemo(() => calculateRegression(points), [points]);
+  const predicted = predictAt(model, Number(prediction));
+  async function setStatus(status: string) {
+    const { error } = await supabase!
+      .from("classroom_sessions")
+      .update({ status })
+      .eq("id", session!.id);
+    if (error) setMessage(error.message);
+    else {
+      setSession((current) => (current ? { ...current, status } : current));
+      setMessage(`Classroom ${status}.`);
+    }
+  }
+  async function clearRecords() {
+    if (confirm("Clear every submitted record?")) {
+      const { error } = await supabase!
+        .from("student_submissions")
+        .delete()
+        .eq("session_id", session!.id);
+      if (error) setMessage(error.message);
+    }
+  }
+  function exportCsv() {
+    const csv = [
+      "student_label,study_hours,exam_marks",
+      ...rows.map(
+        (r) =>
+          `"${(r.student_label || "Anonymous").replaceAll('"', '""')}",${r.study_hours},${r.exam_marks}`,
+      ),
+    ].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${session?.room_code || "classroom"}-data.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setMessage("CSV downloaded.");
+  }
+  const joinUrl = session
+    ? `${window.location.origin}/join/${session.room_code}`
+    : "";
+  const line =
+    model.slope !== null && model.intercept !== null
+      ? [
+          { studyHours: 0, examMarks: model.intercept },
+          { studyHours: 12, examMarks: model.slope * 12 + model.intercept },
+        ]
+      : [];
+  async function deleteSession() {
+    if (!supabase || !session) return;
+    if (
+      !confirm(
+        "Delete this classroom and all submitted regression data? This cannot be undone.",
+      )
+    )
+      return;
+    const { error } = await supabase
+      .from("classroom_sessions")
+      .delete()
+      .eq("id", session.id);
+    if (error) setMessage(error.message);
+    else navigate("/");
+  }
+  return (
+    <main className="dashboard">
+      <header className="dash-header">
+        <div className="brand">
+          <BarChart3 />
+          <div>
+            <strong>Live Regression Lab</strong>
+            <span>{session?.title || "Loading classroom"}</span>
+          </div>
+        </div>
+        <div className="header-status-group">
+          {session && (
+            <div className={`session-state status-${session.status}`} role="status">
+              <span />
+              {session.status}
+            </div>
+          )}
+          <div className={`live-status ${connection.toLowerCase()}`}>
+            <Activity size={16} />
+            {connection}
+          </div>
+        </div>
+      </header>
+      {loading ? (
+        <p className="loading">Loading classroom data...</p>
+      ) : (
+        session && (
+          <>
+            <section className="session-bar">
+              <div>
+                <span className="label">Join classroom</span>
+                <div className="join-code">
+                  {session.room_code}
+                  <button
+                    title="Copy join link"
+                    onClick={() => navigator.clipboard.writeText(joinUrl)}
+                  >
+                    <Copy size={17} />
+                  </button>
+                </div>
+              </div>
+              <div className="student-count">
+                <Users />
+                <strong>{rows.length}</strong>
+                <span>submissions</span>
+              </div>
+              <div className="controls">
+                <button onClick={() => setStatus("active")}>
+                  <Play />
+                  Start
+                </button>
+                <button onClick={() => setStatus("paused")}>
+                  <Pause />
+                  Pause
+                </button>
+                <button onClick={() => setStatus("ended")}>
+                  <Square />
+                  End
+                </button>
+                <button onClick={exportCsv}>
+                  <Download />
+                  CSV
+                </button>
+                <button className="danger" onClick={deleteSession}>
+                  <Trash2 />
+                  Delete session
+                </button>
+              </div>
+            </section>
+            <section className="chart-grid">
+              <article className="chart-panel">
+                <div className="panel-heading">
+                  <div>
+                    <span className="label">Study hours vs. exam marks</span>
+                    <h2>
+                      {rows.length === 0
+                        ? "Waiting for data"
+                        : `${rows.length} observed data points`}
+                    </h2>
+                  </div>
+                  {sample.length > 0 && (
+                    <span className="sample-tag">
+                      Illustrative sample shown
+                    </span>
+                  )}
+                </div>
+                <div className="chart-legend" aria-label="Chart legend">
+                  <span>
+                    <i className="legend-point" />
+                    Student data
+                  </span>
+                  {model.slope !== null && (
+                    <span>
+                      <i className="legend-line" />
+                      Fitted regression line
+                    </span>
+                  )}
+                  {predicted !== null && (
+                    <span>
+                      <i className="legend-prediction" />
+                      Selected prediction
+                    </span>
+                  )}
+                </div>
+                <div className="chart-wrap">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart
+                      margin={{ top: 16, right: 24, bottom: 28, left: 12 }}
+                    >
+                      <CartesianGrid stroke="#d9e0e5" />
+                      <XAxis
+                        type="number"
+                        dataKey="studyHours"
+                        domain={[0, 12]}
+                        name="Study hours"
+                        label={{
+                          value: "Study hours",
+                          position: "insideBottom",
+                          offset: -10,
+                        }}
+                      />
+                      <YAxis
+                        type="number"
+                        dataKey="examMarks"
+                        domain={[0, 100]}
+                        name="Marks"
+                        label={{
+                          value: "Exam marks",
+                          angle: -90,
+                          position: "insideLeft",
+                        }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: "6px",
+                          border: "1px solid #d7dfd9",
+                          boxShadow: "0 8px 20px rgba(23,33,43,.12)",
+                        }}
+                      />
+                      <Scatter
+                        name="Student data"
+                        data={points}
+                        fill="#167c6b"
+                      />
+                      <Scatter
+                        name="Fitted line"
+                        data={line}
+                        fill="#ed6a3a"
+                        line
+                        shape="circle"
+                        isAnimationActive={false}
+                      />
+                      {predicted !== null && (
+                        <Scatter
+                          name="Prediction"
+                          data={[
+                            {
+                              studyHours: Number(prediction),
+                              examMarks: predicted,
+                            },
+                          ]}
+                          fill="#efb000"
+                          shape="diamond"
+                        />
+                      )}
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                </div>
+                {model.slope === null && (
+                  <p className="model-message">{model.message}</p>
+                )}
+              </article>
+              <aside className="metrics">
+                <span className="label">Current model</span>
+                <div className="equation">
+                  ŷ = {fmt(model.slope)}x + {fmt(model.intercept)}
+                </div>
+                <div className="metric-grid">
+                  <Metric label="Slope" value={fmt(model.slope)} />
+                  <Metric label="Intercept" value={fmt(model.intercept)} />
+                  <Metric label="MSE" value={fmt(model.mse)} />
+                  <Metric label="RMSE" value={fmt(model.rmse)} />
+                  <Metric label="SSE" value={fmt(model.sse)} />
+                  <Metric label="R²" value={fmt(model.rSquared)} />
+                </div>
+              </aside>
+            </section>
+            <section className="lower-grid">
+              <article>
+                <span className="label">Prediction tool</span>
+                <h2>New study-hours prediction</h2>
+                <div className="prediction">
+                  <label>
+                    Study hours
+                    <input
+                      type="number"
+                      min="0"
+                      max="12"
+                      step="0.1"
+                      value={prediction}
+                      onChange={(e) => setPrediction(e.target.value)}
+                    />
+                  </label>
+                  <div>
+                    <span>Predicted mark</span>
+                    <strong>{fmt(predicted)}</strong>
+                    {predicted !== null &&
+                      (predicted < 0 || predicted > 100) && (
+                        <small>Raw prediction is outside 0–100.</small>
+                      )}
+                  </div>
+                </div>
+              </article>
+              <article>
+                <span className="label">Sample tools</span>
+                <h2>Demonstration data</h2>
+                <div className="sample-controls">
+                  <button
+                    onClick={() =>
+                      setSample([
+                        { studyHours: 1, examMarks: 42 },
+                        { studyHours: 2, examMarks: 48 },
+                        { studyHours: 3.5, examMarks: 58 },
+                        { studyHours: 5, examMarks: 67 },
+                        { studyHours: 7, examMarks: 79 },
+                        { studyHours: 8.5, examMarks: 88 },
+                      ])
+                    }
+                  >
+                    Load sample data
+                  </button>
+                  <button className="danger" onClick={() => setSample([])}>
+                    Clear sample
+                  </button>
+                </div>
+                <button
+                  className="text-button danger-text"
+                  onClick={clearRecords}
+                >
+                  Clear submitted records
+                </button>
+              </article>
+            </section>
+            <DataTable model={model} />
+            <CalculationPanel model={model} />
+            {message && (
+              <p role="status" className="notice fixed-notice">
+                {message}
+              </p>
+            )}
+          </>
+        )
+      )}
+    </main>
+  );
+}
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+function DataTable({ model }: { model: RegressionResult }) {
+  return (
+    <section className="dataset">
+      <div className="panel-heading">
+        <div>
+          <span className="label">Current dataset</span>
+          <h2>Submitted records</h2>
+        </div>
+      </div>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Study hours</th>
+              <th>Marks</th>
+              <th>Residual</th>
+            </tr>
+          </thead>
+          <tbody>
+            {model.rows.map((r, i) => (
+              <tr key={r.id || i}>
+                <td>{r.studentLabel || "Anonymous"}</td>
+                <td>{r.studyHours}</td>
+                <td>{r.examMarks}</td>
+                <td>{fmt(r.residual)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+function CalculationPanel({ model }: { model: RegressionResult }) {
+  const sx = model.rows.reduce((s, r) => s + r.studyHours, 0),
+    sy = model.rows.reduce((s, r) => s + r.examMarks, 0);
+  return (
+    <details className="calculation">
+      <summary>
+        <span>
+          <strong>How Was This Line Calculated?</strong>
+          <small>View the mathematical derivation</small>
+        </span>
+        <span>+</span>
+      </summary>
+      <div className="calculation-body">
+        <h3>1. Dataset · n = {model.count}</h3>
+        <h3>2–3. Means</h3>
+        <p>
+          x̄ = {fmt(sx)} / {model.count} = {fmt(model.meanX)}
+        </p>
+        <p>
+          ȳ = {fmt(sy)} / {model.count} = {fmt(model.meanY)}
+        </p>
+        <h3>4–6. Deviations and sums</h3>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>xᵢ</th>
+                <th>yᵢ</th>
+                <th>xᵢ−x̄</th>
+                <th>yᵢ−ȳ</th>
+                <th>Product</th>
+                <th>(xᵢ−x̄)²</th>
+              </tr>
+            </thead>
+            <tbody>
+              {model.rows.map((r, i) => (
+                <tr key={r.id || i}>
+                  <td>{r.studentLabel || i + 1}</td>
+                  <td>{r.studyHours}</td>
+                  <td>{r.examMarks}</td>
+                  <td>{fmt(r.dx)}</td>
+                  <td>{fmt(r.dy)}</td>
+                  <td>{fmt(r.covarianceProduct)}</td>
+                  <td>{fmt(r.squaredDx)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Sxy = {fmt(model.sxy)}; Sxx = {fmt(model.sxx)}
+        </p>
+        <h3>7–9. Fit</h3>
+        <p>
+          m = Sxy/Sxx = {fmt(model.slope)}; b = ȳ−mx̄ = {fmt(model.intercept)}
+        </p>
+        <p className="equation-inline">
+          ŷ = {fmt(model.slope)}x + {fmt(model.intercept)}
+        </p>
+        <h3>10–13. Predictions and errors</h3>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>xᵢ</th>
+                <th>Observed yᵢ</th>
+                <th>Predicted ŷᵢ</th>
+                <th>Residual eᵢ</th>
+                <th>eᵢ²</th>
+              </tr>
+            </thead>
+            <tbody>
+              {model.rows.map((r, i) => (
+                <tr key={r.id || i}>
+                  <td>{r.studyHours}</td>
+                  <td>{r.examMarks}</td>
+                  <td>{fmt(r.predicted)}</td>
+                  <td>{fmt(r.residual)}</td>
+                  <td>{fmt(r.squaredResidual)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p>
+          SSE = {fmt(model.sse)} · MSE = {fmt(model.mse)} · RMSE ={" "}
+          {fmt(model.rmse)}
+        </p>
+        <p>
+          SST = {fmt(model.sst)} · R² = {fmt(model.rSquared)}
+        </p>
+        <h3>14. Verification</h3>
+        <p>
+          Line through mean:{" "}
+          {model.passesThroughMean === null
+            ? "Not applicable"
+            : model.passesThroughMean
+              ? "Approximately yes"
+              : "No"}
+        </p>
+        <p>
+          Σ residuals = {fmt(model.residualSum)}; Σ(xᵢ−x̄)eᵢ ={" "}
+          {fmt(model.covarianceResidualSum)}
+        </p>
+      </div>
+    </details>
+  );
+}
