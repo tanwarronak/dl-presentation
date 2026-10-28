@@ -1,3 +1,7 @@
+Control dashboard : https://dl-presentation.vercel.app/
+data form : https://dl-presentation.vercel.app/join/{id}
+**Note** : replace the {id} from actual id 
+
 # Live Regression Lab
 
 A real-time classroom application for collecting study-hours and exam-mark data, fitting simple linear regression, and teaching the calculation step by step.
