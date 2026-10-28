@@ -162,6 +162,10 @@ body { background: #eef2ef; }
 .threshold { width:100%; accent-color:#167c6b; }
 .threshold-value { display:block; margin-bottom:10px; font-size:22px; color:#167c6b; }
 
+/* Regression dashboard omits the optional SST and R-squared outputs. */
+.dashboard:has(.equation) .metrics .metric:nth-child(6),
+.dashboard:has(.equation) .calculation-body > p:nth-of-type(7) { display:none; }
+
 @media (max-width: 900px) {
   .home-grid { grid-template-columns: 1fr; gap: 20px; padding: 36px 16px; }
   .home-grid article { padding: 26px 22px; }
